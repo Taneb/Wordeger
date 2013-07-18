@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 module Data.Wordeger (Wordeger) where
 
+import Data.Bits
 import Data.Maybe
 import Data.Profunctor.Unsafe
 import Data.Vector.Unboxed (Vector)
@@ -8,6 +9,13 @@ import qualified Data.Vector.Unboxed as V
 import Data.Word
 
 newtype Wordeger = Wordeger {_runWordeger :: Vector Bool}
+
+_padToEqual :: Vector Bool -> Vector Bool -> (Vector Bool, Vector Bool)
+_padToEqual a b = let (n, m) = (V.length a, V.length b) in
+  case compare n m of
+    LT -> (a V.++ V.replicate (m - n) False, b)
+    EQ -> (a, b)
+    GT -> (a, b V.++ V.replicate (n - m) False)
 
 _strip :: Vector Bool -> Vector Bool
 _strip v | not (V.null v || V.unsafeLast v) = _strip (V.unsafeInit v)
@@ -129,3 +137,17 @@ instance Real Wordeger where
 instance Integral Wordeger where
   quotRem = undefined
   toInteger = _toNum .# _runWordeger
+  
+instance Bits Wordeger where
+  Wordeger a .&. Wordeger b = Wordeger (V.zipWith (&&) `uncurry` _padToEqual a b)
+  Wordeger a .|. Wordeger b = Wordeger (V.zipWith (||) `uncurry` _padToEqual a b)
+  Wordeger a `xor` Wordeger b = Wordeger (V.zipWith (/=) `uncurry` _padToEqual a b)
+  complement = Wordeger #. V.map not #. _runWordeger
+  shift (Wordeger a) i | i >= 0 = Wordeger (a V.++ V.replicate i False)
+                       | otherwise = Wordeger (V.drop i a)
+  rotate = shift
+  bit i = Wordeger (V.replicate (i - 1) False `V.snoc` True)
+  testBit (Wordeger a) i = fromMaybe False (a V.!? i)
+  bitSize _ = error "Data.Bits.bitSize(Wordeger)"
+  isSigned _ = False
+  popCount = V.foldl' (\acc b -> if b then acc + 1 else acc) 0 .# _runWordeger
