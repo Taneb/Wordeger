@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wall #-}
-module Data.Wordeger where
+module Data.Wordeger (Wordeger) where
 
 import Data.Maybe
 import Data.Profunctor.Unsafe
